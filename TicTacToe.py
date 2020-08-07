@@ -9,7 +9,6 @@
 
 #import necessary libraries
 import numpy as np
-import math
 
 BOARD_SIZE = 3
 positions = {
@@ -24,14 +23,13 @@ positions = {
     (2, 2): "LOWER RIGHT"
 }
 
-
 # core of the program, implements and utilizes User, AI, and Board classes
 class TicTacToe:
     def __init__(self, player1, player2):
-        # constructor function of TicTacToe class
-        # p1_x: Player 1 (Xs), p2_o: Player 2 (Os)
+        # attributes of TicTacToe class
+        # p1_x: player 1 (Xs), p2_o: player 2 (Os)
         # board: tic-tac-toe board (Board class)
-        # is_ai_x/o: checks if Player is of AI class
+        # is_ai_x/o: checks if Player is of AI class (bool)
         self.p1_x = player1
         self.p2_o = player2
         self.board = Board(self.p1_x, self.p2_o)
@@ -90,6 +88,7 @@ class TicTacToe:
                     break
                 # render updated board
                 self.board.render()
+                print()
                 # if game winning move, set player to game_won == True, and break
                 self.board.check_win()
                 # if there are no more moves possible, game concludes in draw, break loop
@@ -110,23 +109,76 @@ class TicTacToe:
             self.board.reset()
 
     # plays the game x number of times in order to train AI
-    # UNFINISHED, NEEDS TO BE FINISHED, RIGHT NOW JUST A PLACEHOLDER
     def training_game(self, x):
+        # train the AI x number of times
         for n in range(x):
-            positions = 0
+            # print loading screen.
+            if (n % 100) == 0:
+                print("Loading {}%".format(100*(n/x)))
+            # perform game while checking if game is over
+            while self.gameIsOver() != True:
+                # get position of board
+                available_positions = self.board.get_avail()
 
-    # gives reward to AI based on decisions of board
-    # winner and loser are AI objects
-    def rewardTTT(self, winner, loser):
-        # get result BEFORE board is reset
-        isWin = self.board.check_win()
-        # give reward through back-propogation
-        if isWin == True:
-            winner.rewardAI(1)
-            loser.rewardAI(0)
+                # get action for p1_x
+                action_player1_row, action_player1_col = self.p1_x.takeTurn(available_positions, self.board.board_state, -1)
+
+                # perform the action and update the board accordingly for future moves.
+                self.board.set_position(self.p1_x, action_player1_row, action_player1_col)
+
+                # append the board for the player to reflect the decision
+                hash_of_board = self.board.getHashOfBoard()
+                self.p1_x.appendHashOfBoard(hash_of_board)
+
+                # check if move won the game
+                win_state = self.board.check_win()
+
+                if win_state == True:
+                    # game has ended, set rewards to AI's
+                    self.rewardTTT(self.p1_x, self.p2_o)
+
+                    # reset everything
+                    self.p1_x.reset()
+                    self.p2_o.reset()
+                    self.board.reset()
+
+                    break
+                elif self.gameIsOver() != True:
+                    # get position of board
+                    available_positions = self.board.get_avail()
+
+                    # get action for p2_o
+                    action_player2_row, action_player2_col = self.p2_o.takeTurn(available_positions, self.board.board_state, 1)
+
+                    # perform the action and update the board accordingly for future moves.
+                    self.board.set_position(self.p2_o, action_player2_row, action_player2_col)
+
+                    # append the board for the player to reflect the decision
+                    hash_of_board = self.board.getHashOfBoard()
+                    self.p2_o.appendHashOfBoard(hash_of_board)
+
+                    # check if move won the game
+                    win_state = self.board.check_win()
+
+                    if win_state == True:
+                        # game has ended, set rewards to AI's
+                        self.rewardTTT(self.p2_o, self.p1_x)
+
+                        # reset everything
+                        self.p1_x.reset()
+                        self.p2_o.reset()
+                        self.board.reset()
+
+                        break
+
+    # checks if game is over
+    def gameIsOver(self):
+        if self.board.check_win:
+            return True
+        elif len(self.board.get_avail()) == 0:
+            return True
         else:
-            winner.rewardAI(0.2)
-            loser.rewardAI(0.2)
+            return False
 
     # validate player move is available and acceptable
     def valid_input(self, row, col):
@@ -137,6 +189,19 @@ class TicTacToe:
         move = (row, col)
         # verify player move is available on board
         return move in self.board.get_avail()
+
+    # gives reward to AI based on decisions of board
+    # winner and loser are AI objects
+    def rewardTTT(self, winner, loser):
+        # get result BEFORE board is reset
+        isWin = self.board.check_win()
+        # give reward through back-propagation
+        if isWin:
+            winner.rewardAI(1)
+            loser.rewardAI(0)
+        else:
+            winner.rewardAI(0.2)
+            loser.rewardAI(0.2)
 
 
 # creates the Tic Tac Toe game and runs it for two players
@@ -149,6 +214,7 @@ class Board:
 
         # create array to hold info about board
         self.board_state = np.zeros((BOARD_SIZE, BOARD_SIZE))
+        self.board_hash = None
 
     def render(self):
         # create rendering array to store values as symbols to display
@@ -169,17 +235,17 @@ class Board:
     # update board based on player's move decision
     def set_position(self, player, row_pos, col_pos):
         # if player x makes a move, update board positions while checking availability
-        if self.X == player and self.board_state[row_pos][col_pos] == 0:
+        if self.X == player:
             self.board_state[row_pos][col_pos] = -1
-        # if player x makes a move, update board positions while checking availability
-        if self.O == player and self.board_state[row_pos][col_pos] == 0:
+        # if player o makes a move, update board positions while checking availability
+        if self.O == player:
             self.board_state[row_pos][col_pos] = 1
 
+    # returns board_state
     def get_board_state(self):
         return self.board_state
 
-    # IS THIS FUNCTION STILL NECESSARY?
-    # Provides a list of available moves
+    # Provides a list of available moves for the AI
     def get_avail(self):
         # pos_list: the returning list with the available positions on the board
         pos_list = []
@@ -187,7 +253,7 @@ class Board:
         for i in range(BOARD_SIZE):
             for j in range(BOARD_SIZE):
                 # if spot is not occupied, append
-                if not self.board_state[i][j]:
+                if self.board_state[i, j] == 0:
                     # the positions dictionary is used to hash the available spot to the list
                     pos_list.append((i, j))
         return pos_list
@@ -195,6 +261,7 @@ class Board:
     # resets board to original state
     def reset(self):
         self.board_state = np.zeros((BOARD_SIZE, BOARD_SIZE))
+        self.board_hash = None
 
     # checks board after every set_position(), and resets if win, stating to player if theres a win or not
     def check_win(self):
@@ -229,6 +296,11 @@ class Board:
         # return win
         return win
 
+    # get hash of board
+    def getHashOfBoard(self):
+        totalPositions = (BOARD_SIZE * BOARD_SIZE)
+        self.board_hash = str(self.board_state.reshape(totalPositions))
+        return self.board_hash
 
 # an AI for the user to go against, epsilon is nonzero when training, zero when trained so no more training occurs.
 class AI:
@@ -245,20 +317,27 @@ class AI:
         self.board_state = []
         self.board_state_q = {}
 
+        self.score = 0
+        self.game_won = False
+        self.turn = [(0,0)]
+
     # make the AI take its turn, random if untrained.
+    # player_symbol will be equal to 1 or -1
     def takeTurn(self, board_available_positions, board_state, player_symbol):
-        # for initialization, use uniform random experimentation
-        if np.random.uniform(0, 1) < self.epsilon:
-            # fill in random square on the board from available positions
-            turn = board_available_positions[np.random.choice(len(board_available_positions))]
+        # Prompt AI for move
+        print("AI's move")
+        #for initializion, use uniform random experimentation
+        if np.random.uniform(0,1) < self.epsilon:
+            #fill in random square on the board from available positions
+            self.turn = board_available_positions[np.random.choice(len(board_available_positions))]
         else:
             # set min value for AI to view as lowest acceptable position.
-            min = -99
+            min = -999
 
             # iterate through all available board positions
             for pos in board_available_positions:
                 # copy board state to modify without changing original board state
-                next_board_state = board_state
+                next_board_state = board_state.copy()
                 # set symbol at position of board, changing board state
                 next_board_state[pos] = player_symbol
                 # get hash of new board state
@@ -268,15 +347,9 @@ class AI:
                 # determine if pos is best move based on trueValue
                 if trueValue >= min:
                     min = trueValue
-                    turn = pos
-
+                    self.turn = pos
         # return AI's decision (turn)
-        # pos_keys: list of positions keys
-        pos_keys = list(positions.keys())
-        # convert turn to positions value
-        turn = pos_keys[board_available_positions.index(turn)]
-        # return row and col
-        return turn[0], turn[1]
+        return self.turn[0], self.turn[1]
 
     # get hash of board
     def getHashOfBoard(self, boardState):
@@ -293,21 +366,31 @@ class AI:
         for state in reversed(self.board_state):
             # check if learned values is empty, meaning first game.
             if self.board_state_q.get(state) is None:
-                # initialize to zero at state location
+                #initiliaze to zero at state location
                 self.board_state_q[state] = 0
             # use q-learning formula and constants to update state table
             self.board_state_q[state] += self.learningRate * (self.decayRate * rewardValue - self.board_state_q[state])
-            # utilize back-propagation for next state behind current state.
+            # utilize backpropogation for next state behind current state.
             rewardValue = self.board_state_q[state]
 
     # after every game, reset board_state to prepare for next game
     def reset(self):
         self.board_state = []
 
+    def player_wins(self):
+        print("\n" + self.name + " wins!!!")
+        self.score += 1
+        self.game_won = False
+
+    def get_username(self):
+        return self.name
+
+    def get_score(self):
+        return self.score
 
 # to register necessary stuff for User to play the game
 class User:
-    def __init__(self, name="player"):
+    def __init__(self, name):
         # username: name of player
         # score: player's score
         # game_won: verifies playing status
@@ -335,19 +418,7 @@ class User:
 
 # main function that implements TicTacToe class
 if __name__ == "__main__":
-    p1 = User("player 1")
-    p2 = User("player 2")
-    ttt = TicTacToe(p1, p2)
-    ttt.play_game()
-
-
-
-
-
-
-
-    '''
-    # create variable to allow user to play again, initialize to True
+    # create variable to allow user to play again, initiliaze to True
     play_again = True
 
     # train AI
@@ -371,9 +442,8 @@ if __name__ == "__main__":
     # ask if user wants to play again based on binary state of playAgain value
     while play_again:
         run.play_game()
-        player_choice = input("Type '1' to play again, and anything else to end the program: ")
+        player_choice = input("Type '1' to play again, and anyything else to end the program: ")
         if player_choice != '1':
             play_again = False
-    '''
 
-# end program.
+  #end program.
